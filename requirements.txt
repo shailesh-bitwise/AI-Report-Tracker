@@ -1,0 +1,8 @@
+Flask
+beautifulsoup4
+requests
+APScheduler
+pydantic
+PyMuPDF
+huggingface-hub<0.25.0
+gunicorn
