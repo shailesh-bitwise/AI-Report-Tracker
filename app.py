@@ -12,8 +12,6 @@ app = Flask(__name__)
 app.config['DOWNLOAD_FOLDER'] = 'downloads'
 os.makedirs(app.config['DOWNLOAD_FOLDER'], exist_ok=True)
 
-GEMINI_API_KEY_MAIN = "AQ.Ab8RN6JL_U-QhZRztOiKknDbfypwT40Vv1Xcz2tGz56o7-kv_w"
-GEMINI_API_KEY_FALLBACK = "AIzaSyBcH_BNdBihpbinfTx8P1k8fztYFD663hk"
 DATA_FILE = "reports_db.json"
 
 TARGET_URLS = [
@@ -39,13 +37,19 @@ class Report(BaseModel):
 class ReportExtraction(BaseModel):
     reports: list[Report]
 
-def extract_with_gemini(batched_data, use_fallback=False):
-    api_key = GEMINI_API_KEY_FALLBACK if use_fallback else GEMINI_API_KEY_MAIN
-    
-    if not batched_data:
+def extract_with_gemini(batched_data):
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        print("CRITICAL ERROR: GEMINI_API_KEY environment variable is missing!", flush=True)
         return []
         
-    prompt = f"Extract the financial reports from the following JSON array of sources. For each report extracted, you MUST return the exact 'source_id' it came from so I can track the URL. If any field is not explicitly mentioned in the text, use 'Not Specified' instead of 'N/A' or leaving it blank. Specifically look closely for the 'target_timeframe' (e.g., '12 months', '1 year') and 'price_target'. CRITICAL: In equity research, price targets are almost universally 12-month targets. If a 'price_target' is found but the timeframe is not explicitly stated in the text, you MUST default 'target_timeframe' to '12 Months'.\nSources: {json.dumps(batched_data)[:60000]}"
+    prompt = f"""
+    You are an expert financial data extractor...
+    (Note: If a target timeframe is unstated, default to 12 Months.)
+    
+    Here is the batched data from {len(batched_data)} sources:
+    {json.dumps(batched_data)}
+    """
     
     schema = {"type": "object", "properties": {"reports": {"type": "array", "items": {"properties": {"source_id": {"type": "integer"}, "firm_name": {"type": "string"}, "company": {"type": "string"}, "headline": {"type": "string"}, "date": {"type": "string"}, "rating": {"type": "string"}, "price_target": {"type": "string"}, "target_timeframe": {"type": "string"}, "key_takeaways": {"items": {"type": "string"}, "type": "array"}, "key_metrics": {"items": {"type": "string"}, "type": "array"}}, "required": ["source_id", "firm_name", "company", "headline", "date", "rating", "price_target", "target_timeframe", "key_takeaways", "key_metrics"], "type": "object"}}}}
     
@@ -64,15 +68,9 @@ def extract_with_gemini(batched_data, use_fallback=False):
             return json.loads(text).get("reports", [])
         else:
             print(f"Gemini API error: {response.status_code} {response.text}", flush=True)
-            if not use_fallback:
-                print("Switching to fallback key...", flush=True)
-                return extract_with_gemini(batched_data, use_fallback=True)
             return []
     except Exception as e:
         print(f"Error calling Gemini via HTTP: {e}", flush=True)
-        if not use_fallback:
-            print("Switching to fallback key...", flush=True)
-            return extract_with_gemini(batched_data, use_fallback=True)
         return []
 
 def automated_scraping_job():
