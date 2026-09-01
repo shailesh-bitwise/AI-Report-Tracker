@@ -75,7 +75,7 @@ def extract_with_gemini(batched_data, use_fallback=False):
         return []
 
 def automated_scraping_job():
-    print(f"[{datetime.datetime.now(, flush=True)}] Starting hourly tracking job...", flush=True)
+    print(f"[{datetime.datetime.now()}] Starting hourly tracking job...", flush=True)
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     
     if os.path.exists(DATA_FILE):
