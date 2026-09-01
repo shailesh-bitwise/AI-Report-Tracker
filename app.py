@@ -185,13 +185,16 @@ def automated_scraping_job():
                 rep['source_type'] = item_info['type']
                 rep['tracked_at'] = str(datetime.datetime.now()) # <-- Track timestamp to sort reverse chronologically!
                 reports_dict[company] = rep
-                print(f"Tracked/Updated {company} ({item_info['type']}, flush=True)")
+                print(f"Tracked/Updated {company} ({item_info['type']})", flush=True)
 
     db['last_updated'] = str(datetime.datetime.now())
     db['reports'] = reports_dict
     with open(DATA_FILE, 'w', encoding='utf-8') as f:
         json.dump(db, f, indent=4)
     print("Job complete. Tracker database saved.", flush=True)
+
+# Start background thread immediately for initial run
+threading.Thread(target=automated_scraping_job, daemon=True).start()
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(func=automated_scraping_job, trigger="interval", minutes=60)
@@ -208,7 +211,3 @@ def get_latest():
             return jsonify(json.load(f))
     return jsonify({"reports": {}, "last_updated": "Never"})
 
-if __name__ == '__main__':
-    import threading
-    threading.Thread(target=automated_scraping_job).start()
-    app.run(host='0.0.0.0', port=7860, debug=False, use_reloader=False)
