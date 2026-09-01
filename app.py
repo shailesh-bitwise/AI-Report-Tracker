@@ -48,7 +48,7 @@ def extract_with_gemini(batched_data, use_fallback=False):
     
     schema = {"type": "object", "properties": {"reports": {"type": "array", "items": {"properties": {"source_id": {"type": "integer"}, "firm_name": {"type": "string"}, "company": {"type": "string"}, "headline": {"type": "string"}, "date": {"type": "string"}, "rating": {"type": "string"}, "price_target": {"type": "string"}, "target_timeframe": {"type": "string"}, "key_takeaways": {"items": {"type": "string"}, "type": "array"}, "key_metrics": {"items": {"type": "string"}, "type": "array"}}, "required": ["source_id", "firm_name", "company", "headline", "date", "rating", "price_target", "target_timeframe", "key_takeaways", "key_metrics"], "type": "object"}}}}
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -62,20 +62,20 @@ def extract_with_gemini(batched_data, use_fallback=False):
             text = data['candidates'][0]['content']['parts'][0]['text']
             return json.loads(text).get("reports", [])
         else:
-            print(f"Gemini API error: {response.status_code} {response.text}")
+            print(f"Gemini API error: {response.status_code} {response.text}", flush=True)
             if not use_fallback:
-                print("Switching to fallback key...")
+                print("Switching to fallback key...", flush=True)
                 return extract_with_gemini(batched_data, use_fallback=True)
             return []
     except Exception as e:
-        print(f"Error calling Gemini via HTTP: {e}")
+        print(f"Error calling Gemini via HTTP: {e}", flush=True)
         if not use_fallback:
-            print("Switching to fallback key...")
+            print("Switching to fallback key...", flush=True)
             return extract_with_gemini(batched_data, use_fallback=True)
         return []
 
 def automated_scraping_job():
-    print(f"[{datetime.datetime.now()}] Starting hourly tracking job...")
+    print(f"[{datetime.datetime.now(, flush=True)}] Starting hourly tracking job...", flush=True)
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     
     if os.path.exists(DATA_FILE):
@@ -94,7 +94,7 @@ def automated_scraping_job():
         try:
             # 1. Telegram scraping
             if "t.me/s/" in url:
-                print(f"Scraping Telegram: {url}")
+                print(f"Scraping Telegram: {url}", flush=True)
                 response = requests.get(url, headers=headers, timeout=15)
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
@@ -124,7 +124,7 @@ def automated_scraping_job():
                     
             # 2. Website/News Deep Article Scraping
             else:
-                print(f"Scraping News Hub: {url}")
+                print(f"Scraping News Hub: {url}", flush=True)
                 response = requests.get(url, headers=headers, timeout=15)
                 soup = BeautifulSoup(response.text, 'html.parser')
                 
@@ -156,11 +156,11 @@ def automated_scraping_job():
                         pass
                 
         except Exception as e:
-            print(f"Error scraping {url}: {e}")
+            print(f"Error scraping {url}: {e}", flush=True)
 
     # Process ALL items in ONE API call to avoid hitting the 20 requests per day limit!
     if items_to_process:
-        print(f"Batching {len(items_to_process)} sources into ONE Gemini API call...")
+        print(f"Batching {len(items_to_process, flush=True)} sources into ONE Gemini API call...")
         extracted = extract_with_gemini(items_to_process)
         
         for rep in extracted:
@@ -185,13 +185,13 @@ def automated_scraping_job():
                 rep['source_type'] = item_info['type']
                 rep['tracked_at'] = str(datetime.datetime.now()) # <-- Track timestamp to sort reverse chronologically!
                 reports_dict[company] = rep
-                print(f"Tracked/Updated {company} ({item_info['type']})")
+                print(f"Tracked/Updated {company} ({item_info['type']}, flush=True)")
 
     db['last_updated'] = str(datetime.datetime.now())
     db['reports'] = reports_dict
     with open(DATA_FILE, 'w', encoding='utf-8') as f:
         json.dump(db, f, indent=4)
-    print("Job complete. Tracker database saved.")
+    print("Job complete. Tracker database saved.", flush=True)
 
 scheduler = BackgroundScheduler()
 scheduler.add_job(func=automated_scraping_job, trigger="interval", minutes=60)
