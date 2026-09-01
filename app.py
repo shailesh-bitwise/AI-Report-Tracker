@@ -1,3 +1,4 @@
+import threading
 import os
 import json
 import requests
@@ -160,7 +161,7 @@ def automated_scraping_job():
 
     # Process ALL items in ONE API call to avoid hitting the 20 requests per day limit!
     if items_to_process:
-        print(f"Batching {len(items_to_process, flush=True)} sources into ONE Gemini API call...")
+        print(f"Batching {len(items_to_process)} sources into ONE Gemini API call...")
         extracted = extract_with_gemini(items_to_process)
         
         for rep in extracted:
