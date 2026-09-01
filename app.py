@@ -53,25 +53,40 @@ def extract_with_gemini(batched_data):
     
     schema = {"type": "object", "properties": {"reports": {"type": "array", "items": {"properties": {"source_id": {"type": "integer"}, "firm_name": {"type": "string"}, "company": {"type": "string"}, "headline": {"type": "string"}, "date": {"type": "string"}, "rating": {"type": "string"}, "price_target": {"type": "string"}, "target_timeframe": {"type": "string"}, "key_takeaways": {"items": {"type": "string"}, "type": "array"}, "key_metrics": {"items": {"type": "string"}, "type": "array"}}, "required": ["source_id", "firm_name", "company", "headline", "date", "rating", "price_target", "target_timeframe", "key_takeaways", "key_metrics"], "type": "object"}}}}
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
     headers = {"Content-Type": "application/json"}
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {"responseMimeType": "application/json", "responseSchema": schema}
     }
 
-    try:
-        response = requests.post(url, headers=headers, json=payload)
-        if response.status_code == 200:
-            data = response.json()
-            text = data['candidates'][0]['content']['parts'][0]['text']
-            return json.loads(text).get("reports", [])
-        else:
-            print(f"Gemini API error: {response.status_code} {response.text}", flush=True)
+    models_to_try = [
+        "gemini-1.5-flash", 
+        "gemini-1.5-pro", 
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash-001",
+        "gemini-1.5-flash-002"
+    ]
+
+    for model_name in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+        try:
+            response = requests.post(url, headers=headers, json=payload)
+            if response.status_code == 200:
+                data = response.json()
+                text = data['candidates'][0]['content']['parts'][0]['text']
+                return json.loads(text).get("reports", [])
+            elif response.status_code == 404:
+                print(f"Model {model_name} not found (404), trying next...", flush=True)
+                continue
+            else:
+                print(f"Gemini API error ({model_name}): {response.status_code} {response.text}", flush=True)
+                return []
+        except Exception as e:
+            print(f"Error calling Gemini HTTP ({model_name}): {e}", flush=True)
             return []
-    except Exception as e:
-        print(f"Error calling Gemini via HTTP: {e}", flush=True)
-        return []
+            
+    print("CRITICAL: All models returned 404 Not Found. Your API key does not have access to Gemini 1.5 models.", flush=True)
+    return []
 
 def automated_scraping_job():
     print(f"[{datetime.datetime.now()}] Starting hourly tracking job...", flush=True)
