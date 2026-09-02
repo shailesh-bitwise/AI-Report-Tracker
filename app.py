@@ -59,34 +59,19 @@ def extract_with_gemini(batched_data):
         "generationConfig": {"responseMimeType": "application/json", "responseSchema": schema}
     }
 
-    models_to_try = [
-        "gemini-1.5-flash", 
-        "gemini-1.5-pro", 
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-flash-001",
-        "gemini-1.5-flash-002"
-    ]
-
-    for model_name in models_to_try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
-        try:
-            response = requests.post(url, headers=headers, json=payload)
-            if response.status_code == 200:
-                data = response.json()
-                text = data['candidates'][0]['content']['parts'][0]['text']
-                return json.loads(text).get("reports", [])
-            elif response.status_code == 404:
-                print(f"Model {model_name} not found (404), trying next...", flush=True)
-                continue
-            else:
-                print(f"Gemini API error ({model_name}): {response.status_code} {response.text}", flush=True)
-                return []
-        except Exception as e:
-            print(f"Error calling Gemini HTTP ({model_name}): {e}", flush=True)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
+    try:
+        response = requests.post(url, headers=headers, json=payload)
+        if response.status_code == 200:
+            data = response.json()
+            text = data['candidates'][0]['content']['parts'][0]['text']
+            return json.loads(text).get("reports", [])
+        else:
+            print(f"Gemini API error (gemini-3.6-flash): {response.status_code} {response.text}", flush=True)
             return []
-            
-    print("CRITICAL: All models returned 404 Not Found. Your API key does not have access to Gemini 1.5 models.", flush=True)
-    return []
+    except Exception as e:
+        print(f"Error calling Gemini HTTP: {e}", flush=True)
+        return []
 
 def automated_scraping_job():
     print(f"[{datetime.datetime.now()}] Starting hourly tracking job...", flush=True)
