@@ -44,10 +44,15 @@ def extract_with_gemini(batched_data):
         return []
         
     prompt = f"""
-    You are an expert financial data extractor...
-    (Note: If a target timeframe is unstated, default to 12 Months.)
+    You are an expert financial data extractor. I am giving you a batch of {len(batched_data)} different scraped news articles and social media posts.
     
-    Here is the batched data from {len(batched_data)} sources:
+    CRITICAL INSTRUCTION: You MUST exhaustively extract EVERY SINGLE financial research report found across ALL of the provided sources. Do NOT stop after the first one. If there are 10 reports in the sources, you must return an array of 10 report objects.
+    
+    For each report extracted, you MUST return the exact 'source_id' it came from so I can track the URL. If any field is not explicitly mentioned in the text, use 'Not Specified' instead of 'N/A' or leaving it blank. Specifically look closely for the 'target_timeframe' (e.g., '12 months', '1 year') and 'price_target'. 
+    
+    CRITICAL: In equity research, price targets are almost universally 12-month targets. If a 'price_target' is found but the timeframe is not explicitly stated in the text, you MUST default 'target_timeframe' to '12 Months'.
+    
+    Here is the batched data:
     {json.dumps(batched_data)}
     """
     
@@ -65,7 +70,9 @@ def extract_with_gemini(batched_data):
         if response.status_code == 200:
             data = response.json()
             text = data['candidates'][0]['content']['parts'][0]['text']
-            return json.loads(text).get("reports", [])
+            reports = json.loads(text).get("reports", [])
+            print(f"Successfully extracted {len(reports)} reports from Gemini!", flush=True)
+            return reports
         else:
             print(f"Gemini API error (gemini-3.6-flash): {response.status_code} {response.text}", flush=True)
             return []
@@ -186,8 +193,12 @@ def automated_scraping_job():
                 reports_dict[company] = rep
                 print(f"Tracked/Updated {company} ({item_info['type']})", flush=True)
 
+    # Sort reports reverse chronologically by tracked_at
+    sorted_reports_list = sorted(reports_dict.values(), key=lambda x: x.get('tracked_at', ''), reverse=True)
+    sorted_reports_dict = {r['company']: r for r in sorted_reports_list}
+
     db['last_updated'] = str(datetime.datetime.now())
-    db['reports'] = reports_dict
+    db['reports'] = sorted_reports_dict
     with open(DATA_FILE, 'w', encoding='utf-8') as f:
         json.dump(db, f, indent=4)
     print("Job complete. Tracker database saved.", flush=True)
